@@ -82,7 +82,7 @@ class _SyncManagerWidgetState extends State<SyncManagerWidget> {
             TextField(
               controller: idController,
               decoration: const InputDecoration(
-                hintText: 'MÃ ID (VÍ DỤ: AB123456)',
+                hintText: 'MÃ ID (VÍ DỤ: wbx7mhhj)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.vpn_key),
               ),
