@@ -149,7 +149,8 @@ class _ProgressScreenState extends State<ProgressScreen> with TickerProviderStat
 
                     if (record != null) {
                       completedNames = record.completedHabitNames;
-                      totalTasks = record.completedHabitsCount;
+                      // 🔥 SỬA TẠI ĐÂY: Dùng record.totalTasks thay vì completedHabitsCount
+                      totalTasks = record.totalTasks;
                       tasksDone = record.completedTasks;
                       completionRate = totalTasks == 0 ? 0.0 : tasksDone / totalTasks;
 
@@ -157,6 +158,11 @@ class _ProgressScreenState extends State<ProgressScreen> with TickerProviderStat
                       if (missedCount > 0) {
                         List<String> potentialMissed = allActiveHabitNames.where((name) => !completedNames.contains(name)).toList();
                         pendingOrMissedNames = potentialMissed.take(missedCount).toList();
+
+                        // 🔥 SỬA TẠI ĐÂY: Fallback nếu thói quen đã bị sếp xóa khỏi danh sách hiện tại
+                        while (pendingOrMissedNames.length < missedCount) {
+                          pendingOrMissedNames.add("Thói quen đã xóa");
+                        }
                       }
                     } else {
                       totalTasks = 0;
@@ -254,8 +260,9 @@ class _ProgressScreenState extends State<ProgressScreen> with TickerProviderStat
               } else if (!isFuture) {
                 String dateStr = cellDate.toIso8601String().split('T')[0];
                 DailyRecord? record = _historyBox.get(dateStr);
-                if (record != null && record.completedHabitsCount > 0) {
-                  rate = record.completedTasks / record.completedHabitsCount;
+                // 🔥 SỬA TẠI ĐÂY: Dùng record.totalTasks thay vì completedHabitsCount
+                if (record != null && record.totalTasks > 0) {
+                  rate = record.completedTasks / record.totalTasks;
                 }
               }
 
