@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../services/sync_service.dart';
+import '../services/email_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -42,6 +43,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ==========================================
+  // [CẬP NHẬT MỚI]: LOGIC NHẬP EMAIL
+  // ==========================================
+  void _editEmail() {
+    String currentEmail = _settingsBox.get('userEmail', defaultValue: '');
+    TextEditingController emailController = TextEditingController(text: currentEmail);
+    bool isDarkMode = _settingsBox.get('isDarkMode', defaultValue: false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Thông báo qua Email', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Nhập email để nhận lời nhắc thực hiện thói quen hàng ngày.",
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 15),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                hintText: "example@gmail.com",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A90E2)),
+            onPressed: () async {
+              _settingsBox.put('userEmail', emailController.text.trim());
+              Navigator.pop(context);
+
+              // GỌI THỬ NGAY LẬP TỨC ĐỂ KIỂM TRA
+              await EmailService.sendEmailReminder("Test Thông Báo Email");
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Đã gửi email thử nghiệm!")),
+              );
+            },
+            child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
   // XỬ LÝ LIÊN KẾT (URL LAUNCHER)
   // ==========================================
   Future<void> _launchURL(String urlString) async {
@@ -73,7 +128,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 20),
             Text("Liên hệ Hỗ trợ", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87)),
             const SizedBox(height: 20),
-
             ListTile(
               leading: const CircleAvatar(backgroundColor: Colors.redAccent, child: Icon(Icons.email_rounded, color: Colors.white)),
               title: Text("Gửi Email cho chúng tôi", style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
@@ -295,6 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Future.microtask(() => box.put('userID', userID));
         }
         String userName = box.get('userName', defaultValue: 'Người dùng mới');
+        String userEmail = box.get('userEmail', defaultValue: 'Chưa thiết lập'); // Lấy email từ Hive
         String avatarPath = box.get('avatarPath', defaultValue: _avatars[0]);
         bool isAvatarFile = box.get('isAvatarFile', defaultValue: false);
         bool isDarkMode = box.get('isDarkMode', defaultValue: false);
@@ -328,6 +383,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSettingCard(isDarkMode, child: Column(children: [
                 ListTile(leading: const Icon(Icons.auto_awesome, color: Colors.amber), title: Text("Thay đổi viền Avatar", style: TextStyle(fontWeight: FontWeight.w600, color: isDarkMode ? Colors.white : Colors.black87)), trailing: Container(width: 24, height: 24, decoration: BoxDecoration(color: currentFrameColor, shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300))), onTap: _showColorPicker),
                 const Divider(height: 1),
+                // --- MỤC THÔNG BÁO EMAIL MỚI THÊM VÀO ---
+                ListTile(
+                  leading: const Icon(Icons.email_outlined, color: Colors.blue),
+                  title: Text("Thông báo qua Email", style: TextStyle(fontWeight: FontWeight.w600, color: isDarkMode ? Colors.white : Colors.black87)),
+                  subtitle: Text(userEmail, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: _editEmail,
+                ),
+                const Divider(height: 1),
                 ListTile(leading: const Icon(Icons.dark_mode_rounded, color: Colors.purple), title: Text("Chế độ ban đêm", style: TextStyle(fontWeight: FontWeight.w600, color: isDarkMode ? Colors.white : Colors.black87)), trailing: CupertinoSwitch(value: isDarkMode, activeColor: Colors.purple, onChanged: (value) => box.put('isDarkMode', value))),
               ])),
               const SizedBox(height: 20),
@@ -341,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ])),
               const SizedBox(height: 20),
 
-              // Hỗ trợ & Liên hệ (TÍNH NĂNG MỚI)
+              // Hỗ trợ & Liên hệ
               _buildSectionTitle("Hỗ trợ cộng đồng", isDarkMode),
               _buildSettingCard(isDarkMode, child: Column(children: [
                 _buildListTile("Trung tâm hỗ trợ", Icons.headset_mic_rounded, isDarkMode, _showContactModal),

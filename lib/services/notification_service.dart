@@ -1,16 +1,20 @@
 import 'dart:ui' show Color;
-import 'dart:io'; // //CẬP NHẬT: Để kiểm tra nền tảng Android/iOS
+import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'email_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  // //CẬP NHẬT: Khởi tạo kèm theo xin quyền Báo thức chính xác (Exact Alarm)
-  static Future<void> init() async {
-    tz.initializeTimeZones();
+  // ID Kênh thông báo - Sếp phải giữ ID này đồng nhất ở mọi nơi
+  static const String _channelId = 'habit_channel_id';
+  static const String _channelName = 'Habit Reminders';
 
+  static Future<void> init() async {
+    // 1. Khởi tạo múi giờ
+    tz.initializeTimeZones();
     try {
       var vnLocation = tz.getLocation('Asia/Ho_Chi_Minh');
       tz.setLocalLocation(vnLocation);
@@ -18,6 +22,7 @@ class NotificationService {
       print("Lỗi thiết lập múi giờ: $e");
     }
 
+    // 2. Cấu hình icon và cài đặt ban đầu
     const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -32,28 +37,43 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(settings);
 
-    // //CẬP NHẬT: Xin quyền thông báo (Android 13+) và quyền Báo thức chính xác
+    // 3. Xử lý riêng cho Android (Tạo Kênh và Xin quyền)
     if (Platform.isAndroid) {
       final androidImplementation = _notificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-      // Xin quyền gửi thông báo
+      // 🔥 BẮT BUỘC: Tạo Notification Channel cho bản Release APK
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: 'Nhắc nhở thực hiện thói quen hàng ngày',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      await androidImplementation?.createNotificationChannel(channel);
+
+      // Xin quyền gửi thông báo (Android 13+)
       await androidImplementation?.requestNotificationsPermission();
 
-      // 🔥 //CẬP NHẬT: Quan trọng nhất để sửa lỗi exact_alarms_not_permitted
-      // Hàm này sẽ kiểm tra và yêu cầu người dùng bật quyền "Báo thức & nhắc nhở" trong cài đặt máy
+      // Xin quyền Báo thức chính xác (Exact Alarm)
       await androidImplementation?.requestExactAlarmsPermission();
     }
   }
 
+  // Cấu hình chi tiết thông báo hiển thị
   static NotificationDetails _notificationDetails() {
     return const NotificationDetails(
       android: AndroidNotificationDetails(
-        'habit_channel_id',
-        'Habit Reminders',
-        channelDescription: 'Nhắc nhở thực hiện thói quen',
+        _channelId,
+        _channelName,
+        channelDescription: 'Nhắc nhở thực hiện thói quen hàng ngày',
         importance: Importance.max,
         priority: Priority.high,
+        ticker: 'ticker',
+        // Đảm bảo icon @mipmap/ic_launcher tồn tại trong res/mipmap
+        icon: '@mipmap/ic_launcher',
         color: Color(0xFF4A90E2),
         playSound: true,
         enableVibration: true,
@@ -62,15 +82,7 @@ class NotificationService {
     );
   }
 
-  static Future<void> showInstantNotification() async {
-    await _notificationsPlugin.show(
-      999,
-      'Sếp ơi!',
-      'Nút Test hoạt động! Quyền và âm thanh đã OK 🚀',
-      _notificationDetails(),
-    );
-  }
-
+  // Đặt lịch thông báo theo thời gian thói quen
   static Future<void> scheduleHabitNotifications({
     required int id,
     required String title,
@@ -79,12 +91,13 @@ class NotificationService {
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
 
+    // Nếu thời gian đã trôi qua thì đặt cho ngày mai
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 
-    // //CẬP NHẬT: Thêm try-catch riêng ở đây để tránh crash khi chưa có quyền
     try {
+      // Thông báo chính đúng giờ
       await _notificationsPlugin.zonedSchedule(
         id,
         'Đến giờ rồi!',
@@ -95,7 +108,11 @@ class NotificationService {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
       );
+      await EmailService.sendEmailReminder(title);
 
+      print("✅ Đã đặt lịch thông báo và gửi email nhắc nhở cho: $title");
+
+      // Thông báo nhắc nhở muộn (sau 6 tiếng)
       tz.TZDateTime lateTime = scheduledDate.add(const Duration(hours: 6));
       tz.TZDateTime midnight = tz.TZDateTime(tz.local, scheduledDate.year, scheduledDate.month, scheduledDate.day, 23, 59);
 
@@ -112,7 +129,7 @@ class NotificationService {
       }
       print("✅ Đã đặt lịch: $title vào lúc $scheduledDate");
     } catch (e) {
-      print("❌ Không thể đặt báo thức chính xác: $e");
+      print("❌ Lỗi đặt lịch: $e");
     }
   }
 

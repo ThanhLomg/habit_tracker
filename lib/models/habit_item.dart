@@ -1,6 +1,5 @@
 import 'package:hive/hive.dart';
 
-// Dòng này CỰC KỲ QUAN TRỌNG để tạo file tự động .g.dart
 part 'habit_item.g.dart';
 
 @HiveType(typeId: 0)

@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkNewDay();
-      setState(() {});
+      // Không cần setState ở đây vì ValueListenableBuilder sẽ lo việc update UI khi data thay đổi
     }
   }
 
@@ -67,19 +67,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return '$weekday, ngày ${now.day} tháng ${now.month} năm ${now.year}';
   }
 
+  // Hàm xóa đã được tối ưu: Chỉ cần xóa trong DB, UI sẽ tự update nhờ ValueListenableBuilder
   void _deleteHabit(HabitItem habit) async {
     if (habit.key != null) {
       await NotificationService.cancelNotification(habit.key as int);
     }
     await habit.delete();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã xóa thói quen'), duration: Duration(seconds: 1)),
+      );
+    }
   }
 
-  // 🟢 [CẬP NHẬT MỚI]: Hàm lấy Icon trực tiếp từ dữ liệu thay vì load ảnh mạng
   Widget _getHabitIcon(HabitItem habit) {
     if (habit.iconCodePoint != null) {
       return Container(
         decoration: BoxDecoration(
-          color: Colors.blue.withOpacity(0.1),
+          color: Colors.blue.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -89,10 +95,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
     } else {
-      // Fallback: Nếu là thói quen cũ chưa có mã Icon thì hiện hình Ngôi sao
       return Container(
         decoration: BoxDecoration(
-          color: Colors.amber.withOpacity(0.1),
+          color: Colors.amber.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.star_rounded, color: Colors.amber, size: 26),
@@ -105,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final historyBox = Hive.box<DailyRecord>('historyBox');
     final now = DateTime.now();
     String todayStr = now.toIso8601String().split('T')[0];
+
     List<HabitItem> allHabits = habitsBox.values.toList();
     List<HabitItem> completedHabits = allHabits.where((h) => h.isCompleted).toList();
 
@@ -121,136 +127,136 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
-        valueListenable: Hive.box('settingsBox').listenable(),
-        builder: (context, Box settingsBox, _) {
-          final isDarkMode = settingsBox.get('isDarkMode', defaultValue: false);
-          final userName = settingsBox.get('userName', defaultValue: 'Bạn');
-          final avatarPath = settingsBox.get('avatarPath', defaultValue: 'https://cdn3d.iconscout.com/3d/premium/thumb/boy-avatar-6299533-5187871.png');
-          final isAvatarFile = settingsBox.get('isAvatarFile', defaultValue: false);
+      valueListenable: Hive.box('settingsBox').listenable(),
+      builder: (context, Box settingsBox, _) {
+        final isDarkMode = settingsBox.get('isDarkMode', defaultValue: false);
+        final userName = settingsBox.get('userName', defaultValue: 'Bạn');
+        final avatarPath = settingsBox.get('avatarPath', defaultValue: 'https://cdn3d.iconscout.com/3d/premium/thumb/boy-avatar-6299533-5187871.png');
+        final isAvatarFile = settingsBox.get('isAvatarFile', defaultValue: false);
 
-          final bgColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFAFAFC);
-          final textColor = isDarkMode ? Colors.white : Colors.black87;
-          final subTextColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
+        final bgColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFAFAFC);
+        final textColor = isDarkMode ? Colors.white : Colors.black87;
+        final subTextColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
 
-          return Scaffold(
-            backgroundColor: bgColor,
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              toolbarHeight: 70,
-              titleSpacing: 20,
-              automaticallyImplyLeading: false,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Xin chào, $userName 👋',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor, letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _getGreeting(),
-                    style: TextStyle(fontSize: 14, color: subTextColor, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              actions: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 20.0),
-                    child: CircleAvatar(
-                      radius: 22,
-                      backgroundColor: isDarkMode ? Colors.blue[900] : Colors.blue[100],
-                      backgroundImage: isAvatarFile
-                          ? FileImage(File(avatarPath)) as ImageProvider
-                          : NetworkImage(avatarPath),
-                    ),
-                  ),
+        return Scaffold(
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            toolbarHeight: 70,
+            titleSpacing: 20,
+            automaticallyImplyLeading: false,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Xin chào, $userName 👋',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor, letterSpacing: -0.5),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _getGreeting(),
+                  style: TextStyle(fontSize: 14, color: subTextColor, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
-            body: ValueListenableBuilder(
-              valueListenable: Hive.box<HabitItem>('habitsBoxV2').listenable(),
-              builder: (context, Box<HabitItem> box, _) {
-                List<HabitItem> habits = box.values.toList();
-                habits.sort((a, b) {
-                  if (a.isCompleted && !b.isCompleted) return 1;
-                  if (!a.isCompleted && b.isCompleted) return -1;
-                  return 0;
-                });
+            actions: [
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 20.0),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: isDarkMode ? Colors.blue[900] : Colors.blue[100],
+                    backgroundImage: isAvatarFile
+                        ? FileImage(File(avatarPath)) as ImageProvider
+                        : NetworkImage(avatarPath),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // CHỈ DÙNG 1 ValueListenableBuilder DUY NHẤT CHO DATA CHÍNH
+          body: ValueListenableBuilder<Box<HabitItem>>(
+            valueListenable: Hive.box<HabitItem>('habitsBoxV2').listenable(),
+            builder: (context, box, _) {
+              List<HabitItem> habits = box.values.toList();
 
-                bool hasMoreThan5 = habits.length > 5;
-                List<HabitItem> displayHabits = (_showAllHabits || !hasMoreThan5)
-                    ? habits
-                    : habits.take(5).toList();
+              // Sắp xếp: Thói quen chưa xong lên đầu
+              habits.sort((a, b) {
+                if (a.isCompleted && !b.isCompleted) return 1;
+                if (!a.isCompleted && b.isCompleted) return -1;
+                return 0;
+              });
 
-                return ListView(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                      child: Text(_getFormattedDate(), style: TextStyle(fontSize: 13, color: subTextColor, fontWeight: FontWeight.w500)),
+              bool hasMoreThan5 = habits.length > 5;
+              List<HabitItem> displayHabits = (_showAllHabits || !hasMoreThan5)
+                  ? habits
+                  : habits.take(5).toList();
+
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 100),
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Text(_getFormattedDate(), style: TextStyle(fontSize: 13, color: subTextColor, fontWeight: FontWeight.w500)),
+                  ),
+                  _buildWeeklyCalendar(isDarkMode),
+                  _buildPromoBanner(context, isDarkMode),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Thói quen hàng ngày', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                        if (hasMoreThan5)
+                          TextButton(
+                            onPressed: () => setState(() => _showAllHabits = !_showAllHabits),
+                            child: Text(_showAllHabits ? 'Thu gọn' : 'Xem tất cả',
+                                style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue[600], fontSize: 13, fontWeight: FontWeight.bold)),
+                          )
+                      ],
                     ),
-                    _buildWeeklyCalendar(isDarkMode),
+                  ),
 
-                    _buildPromoBanner(context, isDarkMode),
-
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Thói quen hàng ngày', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                          if (hasMoreThan5)
-                            TextButton(
-                              onPressed: () => setState(() => _showAllHabits = !_showAllHabits),
-                              child: Text(_showAllHabits ? 'Thu gọn' : 'Xem tất cả',
-                                  style: TextStyle(color: isDarkMode ? Colors.blue[300] : Colors.blue[600], fontSize: 13, fontWeight: FontWeight.bold)),
-                            )
-                        ],
+                  if (habits.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 30),
+                        child: Text('Chưa có thói quen nào.\nHãy bắt đầu ngay!', textAlign: TextAlign.center, style: TextStyle(color: subTextColor, fontSize: 15)),
+                      ),
+                    )
+                  else
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.fastOutSlowIn,
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        children: displayHabits.map((habit) {
+                          return HabitCard(
+                            key: ValueKey(habit.key),
+                            habit: habit,
+                            thumbnailWidget: _getHabitIcon(habit),
+                            onDelete: () => _deleteHabit(habit),
+                            onComplete: _updateDailyHistory,
+                            isDarkMode: isDarkMode,
+                          );
+                        }).toList(),
                       ),
                     ),
-
-                    if (habits.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 30),
-                          child: Text('Chưa có thói quen nào.\nHãy bắt đầu ngay!', textAlign: TextAlign.center, style: TextStyle(color: subTextColor, fontSize: 15)),
-                        ),
-                      )
-                    else
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.fastOutSlowIn,
-                        alignment: Alignment.topCenter,
-                        child: Column(
-                          children: displayHabits.map((habit) {
-                            return HabitCard(
-                              key: ValueKey(habit.key),
-                              habit: habit,
-                              // 🟢 GỌI HÀM LẤY ICON Ở ĐÂY NÀY SẾP
-                              thumbnailWidget: _getHabitIcon(habit),
-                              onDelete: () => _deleteHabit(habit),
-                              onComplete: _updateDailyHistory,
-                              isDarkMode: isDarkMode,
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          );
-        }
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
+  // --- WIDGET HELPER ---
   Widget _buildWeeklyCalendar(bool isDarkMode) {
     DateTime now = DateTime.now();
     DateTime monday = now.subtract(Duration(days: now.weekday - 1));
@@ -334,6 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
+// --- HABIT CARD WIDGET ---
 class HabitCard extends StatefulWidget {
   final HabitItem habit;
   final Widget thumbnailWidget;
@@ -393,7 +400,7 @@ class _HabitCardState extends State<HabitCard> with TickerProviderStateMixin {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Chưa đến giờ ($timeStr)! Đừng vội vàng nhé ⏳'),
+            content: Text('Chưa đến giờ ($timeStr)! Hãy kiên nhẫn đợi thêm nhé ⏳'),
             backgroundColor: Colors.orange[700],
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
